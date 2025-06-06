@@ -375,3 +375,15 @@ Test()
 显示descriptor __dict__ can apply to test.
 这是因为把旧的mapproxy discriptor 带到新的类了，所以报错。
 推测 mapproxy中有一些特别的检查》 
+# method vs func:
+```py
+<function Test.class_func at 0x73c5c4c41300>
+<bound method Test.class_func of <__main__.Test object at 0x73c5c4dff5f0>>
+```
+注意A.fuc 和 a.func的重要区别，原因是对于func是个描述符，会判断当前是有什么调用的，实例调用会有包装。
+# classmethod底层实现原理。
+classmethod是一个内置函数。
+会进行类似make_method的绑定操作。
+只不过，绑定的是类。与普通a.method别无二至。
+
+# class vs module:
