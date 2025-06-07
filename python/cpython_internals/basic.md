@@ -375,3 +375,23 @@ Test()
 显示descriptor __dict__ can apply to test.
 这是因为把旧的mapproxy discriptor 带到新的类了，所以报错。
 推测 mapproxy中有一些特别的检查》 
+# 属性访问的字节码：
+```py
+  // 加载变量 g
+ 20 LOAD_NAME                1 (g)
+  // 获取 g.name，加载属性用的是 LOAD_ATTR
+ 22 LOAD_ATTR                2 (name)
+  // 将结果交给变量 name 保存
+ 24 STORE_NAME               2 (name)
+  
+  // g.get_info() 对应的字节码
+  // 加载变量 g
+ 26 LOAD_NAME                1 (g)
+  // 获取方法 g.get_info，加载方法用的是 LOAD_METHOD
+ 28 LOAD_METHOD              3 (get_info)
+  // 调用方法，注意指令是 CALL_METHOD，不是 CALL_FUNCTION
+  // 但显然 CALL_METHOD 内部也是调用了 CALL_FUNCTION
+ 30 CALL_METHOD              0
+  // 从栈顶弹出返回值
+```
+一个是LOAD_METHOD 另一个是LOAD_ATTR

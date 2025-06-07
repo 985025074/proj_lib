@@ -22,3 +22,6 @@ class TestMyEnum(MyEnum):
     nihao = 123
 
 print(TestMyEnum.nihao)  # ✅ 输出: MyEnumImpl(123)
+
+
+
