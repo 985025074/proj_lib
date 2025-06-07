@@ -387,3 +387,221 @@ classmethod是一个内置函数。
 只不过，绑定的是类。与普通a.method别无二至。
 
 # class vs module:
+首先在这里我们必须强调一点，一个单独的 .py 文件、或者 .pyc 文件、.pyd 文件，我们称之为一个模块 ；而多个模块组合起来放在一个目录中，这个目录我们称之为包。但不管是模块，还是包，在虚拟机的眼中，它们都是 PyModuleObject 结构体实例，类型为 PyModule_Type，而在 Python 中则都是一个 <class 'module'> 对象。
+## 动态导入：
+```py
+# 有一个文件 F:\mashiro\test.py，我们如何才能将它导入进来呢？
+from importlib.machinery import SourceFileLoader
+
+# 第一个参数是模块名，第二个参数是模块的路径
+# 这样就可以实现导入了，所以这是基于文件路径进行加载的
+# 这个做法能够保证无论文件在什么地方，都可以进行导入
+test = SourceFileLoader("test", r"F:\mashiro\test.py").load_module()
+
+# 但有一点需要注意，如果是导入包的话，那么要导入包里面的 __init__.py 文件
+pd = SourceFileLoader(
+    "我是 pandas 模块",
+    r"C:\python38\lib\site-packages\pandas\__init__.py"
+).load_module()
+print(pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]}))
+"""
+   a  b
+0  1  4
+1  2  5
+2  3  6
+"""
+# 如果只写到 pandas，那么会抛出 PermissionError，因为我们不能把目录当成文件来读取
+# 至于 import 一个包，本质上也是加载包内部的 __init__.py 
+
+# 但上面这个类只能加载 py 文件，如果想加载 pyc、pyd 文件，需要用下面两个类
+# 但需要注意的是，加载普通文件和 pyc 文件时，我们可以随便起名字，也就是第一个参数任意
+# 但对于 pyd 文件，第一个参数必须和 pyd 文件的名字保持一致。
+from importlib.machinery import SourcelessFileLoader  # pyc
+from importlib.machinery import ExtensionFileLoader   # pyd
+    
+
+或者:
+import importlib
+
+a = "pandas"
+pd = importlib.import_module(a)
+# 很方便地就导入了，直接通过字符串的方式导入一个 module 对象
+print(pd)  
+"""
+<module 'pandas' from 'C:\\python38\\lib\\site-packages\\pandas\\__init__.py'>
+"""
+
+# 如果想导入 "模块中导入的模块"
+# 比如: 模块 a 中导入了模块 b，我们希望导入 a.b
+# 或者导入一个包下面的子模块，比如 pandas.core.frame
+sub_mod = importlib.import_module("pandas.core.frame")
+# 我们看到可以自动导入 pandas.core.frame
+print(sub_mod)  
+"""
+<module 'pandas.core.frame' from 'C:\\python38\\lib\\site-packages\\pandas\\core\\frame.py'>
+"""
+
+# 但如果是 __import__，默认的话是不行的，导入的依旧是最外层的 pandas
+print(__import__("pandas.core.frame"))
+"""
+<module 'pandas' from 'C:\\python38\\lib\\site-packages\\pandas\\__init__.py'>
+"""
+# 可以通过给 fromlist 指定一个非空列表来实现
+print(__import__("pandas.core.frame", fromlist=[""]))
+"""
+<module 'pandas.core.frame' from 'C:\\python38\\lib\\site-packages\\pandas\\core\\frame.py'>
+"""
+
+```
+## 生成模块。
+只需要在对应的地方exec代码，替换明明空间就可以
+# 模块导入：
+内置模块。都在sys.modules 这些是原生的，都是以C的形式写死在代码里，手动import 也是同一个。
+值得注意的是，外置module再加载的时候也会进入这个dict。
+**这在一定程度上带来了防止重复加载的好处**
+## main 也是个module：
+```py
+import exp
+
+import sys
+
+
+print(dir(exp))
+print(dir())
+print([i for i in dir() if i not in dir(exp)])
+
+print(__annotations__)
+```
+发现dir()当前空间多了一个__anotations__
+# package vs module：
+```py
+此时又看到了神奇的地方，我们在 test_import 目录里面创建了 __init__.py 之后，再打印 test_import，得到的结果又变了，告诉我们这个包来自于包里面的 __init__.py 文件。所以就像之前说的，Python 对包和模块的概念区分的不是很明显，我们就把包当做该包下面的 __init__.py 文件即可，__init__.py 中定义了什么，那么这个包里面就有什么。
+```
+# 相对导入 与包：
+```py
+我们发现报错了，提示没有 a 这个模块，可是我们明明在包里面定义了呀。还记得之前说的导入一个模块、导入一个包会做哪些事情吗？导入一个模块，会将该模块里面的内容 "拿过来" 执行一遍，导入包会将该包里面的 __init__.py 文件 "拿过来" 执行一遍。注意：这里把 "拿过来" 三个字加上了引号。
+
+我们在和 test_import 目录同级的 py 文件中导入了 test_import，那么就相当于把里面的 __init__ 拿过来执行一遍（当然只有第一次导入的时候才会这么做）。但是它们具有单独的空间，是被隔离的，访问时需要使用符号 test_import 来访问。
+
+但是正如之前所说，是 "拿过来" 执行，所以这个 __init__.py 里面的内容是"拿过来"，在当前的 .py 文件（在哪里导入的就是哪里）中执行的。所以由于 import a 这行代码表示绝对导入，就相当于在当前模块里面导入，会从 sys.path 里面搜索，但模块 a 是在 test_import 包里面，那么此时还能找到这个 a 吗？显然是不能的，除非我们将 test_import 所在路径加入到 sys.path 中。
+
+那 from . import a 为什么就好使呢？因为这种导入方式是相对导入，表示要在 __init__.py 所在目录里面找，那么不管在什么地方导入这个包，由于 __init__.py 的位置是不变的，所以 from . import a 这种相对导入的方式总能找到对应的 a。
+```
+
+![alt text](image.png)
+**使用相对导入的模块（往往处于包内部） 不能和执行的模块（__main__）在同一个目录下**  
+见上，data_c中导入了data_b，而data_b中使用了相对导入语法：
+```py
+# data_b.py
+from .data_a import a
+b = a
+```
+
+
+# 执行长链import：
+import a.b.c
+会导入a 
+b
+c
+但是使用的时候必须带着链条去用 不能 b... c.. 只可以 a.b.c  
+
+
+**实际上，我们一般用的是from xx import xx 完美解决这个问题**
+```py
+import sys
+# test_import 是一个目录，里面有一个 __init__.py 和一个 a.py
+# 在 __init__.py 中导入了 a.py
+from test_import import a
+
+print(sys.modules.get("test_import") is not None)  # True
+print(sys.modules.get("test_import.a") is not None)  # True
+print(sys.modules.get("a") is not None)  # False
+
+```
+但是，实际上也是导入了父类包，这是无法绕过的。只是用不了了
+# 路径搜索机制
+一个包下的其余模块会通过package.__path__去搜索（是package 所在目录），而不是按照python的所有搜索路径
+```py
+import six
+import numpy as np
+import numpy.core
+
+print(np.__name__, np.__path__) 
+"""
+numpy ['C:\\python38\\lib\\site-packages\\numpy']
+"""
+
+print(np.core.__name__, np.core.__path__)
+"""
+numpy.core ['C:\\python38\\lib\\site-packages\\numpy\\core']
+"""
+
+print(six.__name__, six.__path__) 
+"""
+six []
+"""
+
+```
+__path__是package 特有机制
+# __file__:
+一般情况，就是当前文件的路径，对于package 就是 __init__.py的路径
+
+# 模块也有缓存池
+一旦被import，修改将不复起效，需要importlib.reload
+
+# 小总结。
+不管什么导入。都会在sys.modules[]里存入长链路径格式，这是为了避免重复导入...
+另外，不同的导入方式只是暴露的不同 ，也就是globals()不同
+
+# 线程与进程
+1. 多个线程共享进程的同一份sys和builtins 以及一些内置的函数 库。
+2. 内置函数的添加是在inter初始化的过程中进行的。
+/usr/lib/python3.12/site.py
+
+## GIL：
+GIL锁的是字节码。
+```py
+import threading
+
+a = 0
+
+def func1():
+    global a
+    for i in range(1000):
+        a = a + 1
+
+threadPool = []
+for i in range(1000):
+    threadPool.append(threading.Thread(target=func1))
+for t in threadPool:
+    t.start()
+for t in threadPool:
+    t.join()
+
+print(a)
+
+          
+
+```
+however,i dont find the bug here.
+### 释放GIL：
+做的操作有：
+- 保存线程状态。（保存Py级别的数据）
+- 释放GIL：
+- 执行C操作。
+- 获得GIL
+
+### GIL 的产生:
+```py
+然后我们还看到了多线程环境的初始化动作，从这里可以看出，在开启多线程之前，支持多线程的数据结构、以及 GIL 都还没有创建。因为对多线程的支持是需要代价的，如果上来就激活了多线程，但是程序却只有一个主线程，那么 Python 仍然会执行所谓的线程调度机制，只不过调度完了还是它自己，所以这无异于在做无用功。因此 Python 将开启多线程的权利交给了程序员，自己在启动的时候是单线程，既然是单线程，自然就不存在线程调度了，当然也没有 GIL。
+
+而一旦调用了 threading.Thread(...).start()，底层对应 _thread.start_new_thread()，则代表明确地指示虚拟机要创建新的线程。这个时候虚拟机就知道自己该创建与多线程相关的东西了，比如数据结构、环境、以及那个至关重要的 GIL。
+```
+
+###  GIL的作用机制：
+
+take_gil,和drop_gil .  
+首先gil的产生源于thread的new 。
+在eval_frame主for 循环里，最开始的是获取GIL 以及释放GIL的操作，  
+take_gil尝试获取GIL，然后在一个while循环内部，不断判断运行时间，如果运行时间过长，会设置当前GIL的一个变量为1 ，使得获取GIL的进程下次进入开头的时候释放掉GIL，同时该释放GIL的进程再次调用take_gil从而阻塞。
+
