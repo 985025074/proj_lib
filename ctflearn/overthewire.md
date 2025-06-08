@@ -16,5 +16,3 @@ n 下一个 N 上一个
 # ssh 公钥在服务器，私钥在本地。
 # ssl 和 tsl 没太明白，大概就是你穿我 我传你，用密钥加密
 
-
-kSkvUpMQ7lBYyCM4GBPvCvT1BfWRy0Dx

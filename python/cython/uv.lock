@@ -1,0 +1,56 @@
+version = 1
+revision = 2
+requires-python = ">=3.12"
+
+[[package]]
+name = "cython"
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/d3/bb000603e46144db2e5055219bbddcf7ab3b10012fcb342695694fb88141/cython-3.1.1.tar.gz", hash = "sha256:505ccd413669d5132a53834d792c707974248088c4f60c497deb1b416e366397", size = 3175446, upload-time = "2025-05-19T09:44:54.347Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/06/83ff82381319ff68ae46f9dd3024b1d5101997e81a8e955811525b6f934b/cython-3.1.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:9d7dc0e4d0cd491fac679a61e9ede348c64ca449f99a284f9a01851aa1dbc7f6", size = 3006334, upload-time = "2025-05-19T09:57:14.284Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/01/b4c46c6a27cd2da642bc987c1f9087265defbc96a1929d326b9034953f15/cython-3.1.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:fd689910002adfac8734f237cdea1573e38345f27ed7fd445482813b65a29457", size = 2836861, upload-time = "2025-05-19T09:57:16.129Z" },
+    { url = "https://files.pythonhosted.org/packages/96/51/7936c5d01ec3c89be8de1756f284878d4a567627b7b1790455ac627fb833/cython-3.1.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:10f0434916994fe213ea7749268b88d77e3ebcbd1b99542cf64bb7d180f45470", size = 3074560, upload-time = "2025-05-19T09:57:18.797Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/81/34aeb787dcb2624a82a33e60276ed28d2da8a08c79660cf674b19be82248/cython-3.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:873aac4ac0b0fb197557c0ac15458b780b9221daa4a716881cbd1a9016c8459f", size = 3192645, upload-time = "2025-05-19T09:57:21.002Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/bf/1350ed6cb48158a4f096306a12bc4c26c6d20d3314f1f1978ea23afe0220/cython-3.1.1-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:23b886a6c8a50b1101ccef2f2f3dc9c699b77633ef5bb5007090226c2ad3f9c2", size = 3241751, upload-time = "2025-05-19T09:57:23.118Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/f5/9ed5a898c41723e3da2317fd1f082d963ff08571caeded31cb945be589b5/cython-3.1.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:dff0e7dd53a0ca35b64cda843253d5cac944db26663dc097b3a1adf2c49514ad", size = 3123562, upload-time = "2025-05-19T09:57:25.492Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/81/b5ce4393d3a0a75a8c6d9ad0b80a62263d892260b816eb3d569ef144511a/cython-3.1.1-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:0f7954b0b4b3302655d3caa6924261de5907a4e129bc22ace52fe9ae0cd5a758", size = 3333555, upload-time = "2025-05-19T09:57:29.232Z" },
+    { url = "https://files.pythonhosted.org/packages/db/47/2c1fa4b4901f10d00e666931dd68d4bd7954d3caa900544d135424ef6178/cython-3.1.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:dfa500fd7ae95ca152a5f8062b870532fa3e27efcef6d00612e1f28b9f72615f", size = 3282112, upload-time = "2025-05-19T09:57:31.904Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/5b/b000d3ebff79429419d846e06c5c09f33fd010e1f6158d7ba553e1082253/cython-3.1.1-cp312-cp312-win32.whl", hash = "sha256:cd748fab8e4426dbcb2e0fa2979558333934d24365e0de5672fbabfe337d880c", size = 2462293, upload-time = "2025-05-19T09:57:34.964Z" },
+    { url = "https://files.pythonhosted.org/packages/45/0e/e1370ed3216e4e164232d1891c2a2932a3874d1a8681f8c3565cafd98579/cython-3.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:307f216ed319ea07644f2ef9974406c830f01bc8e677e2147e9bfcdf9e3ca8ad", size = 2666710, upload-time = "2025-05-19T09:57:37.528Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/ec/7bc61e156f71cefdc1c7c2a9b8d25facdf6d208f9e19a80aa4ae56a9842e/cython-3.1.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:cb5661941707bd41ec7a9c273d698113ac50392444f785088e9d9706c6a5937b", size = 2990324, upload-time = "2025-05-19T09:57:39.962Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/86/2f2550dcda3b54c65c9132ec95470cc4115b96a78163e539e0a02f767f05/cython-3.1.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:28b174f41718a7041cfbe0f48913020875ff1aaa4793942b2451ac6d2baf3f07", size = 2822556, upload-time = "2025-05-19T09:57:41.989Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/f8/b7a14323ee8474be00909469dd115e84d28719aaf94a55623fd6366dcab5/cython-3.1.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c740a10cd0f50321d048c8ca318eefb4c42b8bffef982dcd89c946d374192702", size = 3060223, upload-time = "2025-05-19T09:57:46.439Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/90/9fe8b93fa239b4871252274892c232415f53d5af0859c4a6ac9b1cbf9950/cython-3.1.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7da069ca769903c5dee56c5f7ab47b2b7b91030eee48912630db5f4f3ec5954a", size = 3180196, upload-time = "2025-05-19T09:57:48.619Z" },
+    { url = "https://files.pythonhosted.org/packages/01/95/8fe6282a846f8ce56bb62434b48053910c68c94ec5da3bd47bc2de0bb5e2/cython-3.1.1-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:24c640c0746d984789fe2787a098f06cda456ef2dd78b90164d17884b350839a", size = 3208726, upload-time = "2025-05-19T09:57:51.258Z" },
+    { url = "https://files.pythonhosted.org/packages/be/28/7db9e79a5099659f6e46c48577f582e6b542873159c3f65033a247e364b5/cython-3.1.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:426d78565eb91d3366569b20e92b8f14bffef5f57b2acd05b60bbb9ce5c056a1", size = 3112452, upload-time = "2025-05-19T09:57:53.365Z" },
+    { url = "https://files.pythonhosted.org/packages/44/68/de53aff8db5f05efd9fe7f1435aa6019573b94ae151ef82a66ca20b4ec57/cython-3.1.1-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:b181158b5761bdaf40f6854f016ab7ddff64d3db4fca55cb3ca0f73813dd76d6", size = 3305698, upload-time = "2025-05-19T09:57:55.485Z" },
+    { url = "https://files.pythonhosted.org/packages/52/e9/a54f53ba5feeb00e187e24ba6fc7b085075e8ac53ed22797ac9d77db7422/cython-3.1.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:7489559e6c5ecbba49d535c2e03cf77c2594a3190b6aca7da5b508ba1664a89a", size = 3258348, upload-time = "2025-05-19T09:57:57.605Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/07/8c1a2ff59af7976ba16afe8cd54a070ce2986924cacecc7812236bf7f1c7/cython-3.1.1-cp313-cp313-win32.whl", hash = "sha256:263cb0e497910fb5e0a361ad1393b6d728b092178afecc56e8a786f3739960c3", size = 2457891, upload-time = "2025-05-19T09:57:59.675Z" },
+    { url = "https://files.pythonhosted.org/packages/79/5e/c469f7b42e145a06af79a3f7b599454c028a823c6a83adc867ddfd02f941/cython-3.1.1-cp313-cp313-win_amd64.whl", hash = "sha256:e000f0533eedf3d6dfbe30bb3c58a054c58f0a7778390342fa577a0dc47adab3", size = 2665693, upload-time = "2025-05-19T09:58:02.262Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/97/8e8637e67afc09f1b51a617b15a0d1caf0b5159b0f79d47ab101e620e491/cython-3.1.1-py3-none-any.whl", hash = "sha256:07621e044f332d18139df2ccfcc930151fd323c2f61a58c82f304cffc9eb5280", size = 1220898, upload-time = "2025-05-19T09:44:50.614Z" },
+]
+
+[[package]]
+name = "cython-exp"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "cython" },
+    { name = "setuptools" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cython", specifier = ">=3.1.1" },
+    { name = "setuptools", specifier = ">=80.9.0" },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
+]

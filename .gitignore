@@ -1,1 +1,5 @@
 *.pyc
+.env
+build/
+*.so
+.vscode
