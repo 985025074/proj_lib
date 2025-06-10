@@ -181,3 +181,7 @@ The sticky bit means that the directory only allows the owners of files to renam
 # yes!
 通过不断输出yes填满内存
 # rm -rf/ 仍然可以用shell 完就一切
+
+
+
+./ ok now i finish all cousrse!
