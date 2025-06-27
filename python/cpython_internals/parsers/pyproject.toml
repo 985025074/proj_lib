@@ -1,0 +1,10 @@
+[project]
+name = "parsers"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pegen>=0.3.0",
+    "pgen>=0.2.1",
+]

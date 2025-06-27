@@ -1,3 +1,14 @@
-import code1
+from dis import Bytecode
 
-print(code1.fib(18))
+src = """\
+22
+333
+__dataclass_fields__: ClassVar
+"""
+
+code = compile(src, "<string>", "exec")
+print(code.co_consts)
+annotate_code = code.co_consts[1]
+
+for bc in Bytecode(annotate_code):
+    print(bc.positions, bc.opname)

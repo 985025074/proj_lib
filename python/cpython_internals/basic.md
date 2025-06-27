@@ -12,7 +12,6 @@
 下面__new__函数根据cls 对象返回实例对象给__init__函数，也就是所谓的self
 ```py
 class A:
-
     def __new__(cls, *args, **kwargs):
         print("__new__")
         # 这里的参数 cls 就表示 A 这个类本身
