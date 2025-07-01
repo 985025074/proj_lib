@@ -1,3 +1,8 @@
+# gdb 调试小计：
+断点
+
+break 文件 Tab 补全可以快速
+layout src better than display
 # 关于Cpython 项目配置
 首先查看cpython 官网的dev guide.  
 首先安装pre-commit.pre-commit 安装:`sudo apt install pre-commit`.
@@ -490,5 +495,583 @@ config里是一些基本配置。
 args 被设置到Pyconfig上
 然后从PyConfig 再次初始化runtime
 
+
+
+ ## 初始化完毕回到执行处代码：
+```c
+static int
+pymain_main(_PyArgv *args)
+{
+    PyStatus status = pymain_init(args);
+    if (_PyStatus_IS_EXIT(status)) {
+        pymain_free();
+        return status.exitcode;
+    }
+    if (_PyStatus_EXCEPTION(status)) {
+        pymain_exit_error(status);
+    }
+
+    return Py_RunMain();
+}
+
+```
+
+ PyRun_main()
+
+ ``` C
+ int
+Py_RunMain(void)
+{
+    int exitcode = 0;
+
+    _PyRuntime.signals.unhandled_keyboard_interrupt = 0;
+
+    pymain_run_python(&exitcode);
+
+    if (Py_FinalizeEx() < 0) {
+        /* Value unlikely to be confused with a non-error exit status or
+           other special meaning */
+        exitcode = 120;
+    }
+
+    pymain_free();
+
+    if (_PyRuntime.signals.unhandled_keyboard_interrupt) {
+        exitcode = exit_sigint();
+    }
+
+    return exitcode;
+}
+
+```
+平平无奇，继续执行代码。
+```C
+static void
+pymain_run_python(int *exitcode)
+{
+    PyObject *main_importer_path = NULL;
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    /* pymain_run_stdin() modify the config */
+    PyConfig *config = (PyConfig*)_PyInterpreterState_GetConfig(interp);
+
+    /* ensure path config is written into global variables */
+    if (_PyStatus_EXCEPTION(_PyPathConfig_UpdateGlobal(config))) {
+        goto error;
+    }
+
+    // XXX Calculate config->sys_path_0 in getpath.py.
+    // The tricky part is that we can't check the path importers yet
+    // at that point.
+    assert(config->sys_path_0 == NULL);
+
+    if (config->run_filename != NULL) {
+        /* If filename is a package (ex: directory or ZIP file) which contains
+           __main__.py, main_importer_path is set to filename and will be
+           prepended to sys.path.
+
+           Otherwise, main_importer_path is left unchanged. */
+        if (pymain_get_importer(config->run_filename, &main_importer_path,
+                                exitcode)) {
+            return;
+        }
+    }
+
+    // import readline and rlcompleter before script dir is added to sys.path
+    pymain_import_readline(config);
+
+    PyObject *path0 = NULL;
+    if (main_importer_path != NULL) {
+        path0 = Py_NewRef(main_importer_path);
+    }
+    else if (!config->safe_path) {
+        int res = _PyPathConfig_ComputeSysPath0(&config->argv, &path0);
+        if (res < 0) {
+            goto error;
+        }
+        else if (res == 0) {
+            Py_CLEAR(path0);
+        }
+    }
+    // XXX Apply config->sys_path_0 in init_interp_main().  We have
+    // to be sure to get readline/rlcompleter imported at the correct time.
+    if (path0 != NULL) {
+        wchar_t *wstr = PyUnicode_AsWideCharString(path0, NULL);
+        if (wstr == NULL) {
+            Py_DECREF(path0);
+            goto error;
+        }
+        config->sys_path_0 = _PyMem_RawWcsdup(wstr);
+        PyMem_Free(wstr);
+        if (config->sys_path_0 == NULL) {
+            Py_DECREF(path0);
+            goto error;
+        }
+        int res = pymain_sys_path_add_path0(interp, path0);
+        Py_DECREF(path0);
+        if (res < 0) {
+            goto error;
+        }
+    }
+
+    pymain_header(config);
+
+    _PyInterpreterState_SetRunningMain(interp);
+    assert(!PyErr_Occurred());
+
+    if (config->run_command) {
+        *exitcode = pymain_run_command(config->run_command);
+    }
+    else if (config->run_module) {
+        *exitcode = pymain_run_module(config->run_module, 1);
+    }
+    else if (main_importer_path != NULL) {
+        *exitcode = pymain_run_module(L"__main__", 0);
+    }
+    else if (config->run_filename != NULL) {
+        *exitcode = pymain_run_file(config);
+    }
+    else {
+        *exitcode = pymain_run_stdin(config);
+    }
+
+    pymain_repl(config, exitcode);
+    goto done;
+
+error:
+    *exitcode = pymain_exit_err_print();
+
+done:
+    _PyInterpreterState_SetNotRunningMain(interp);
+    Py_XDECREF(main_importer_path);
+}
+
+
+```
+从上面可以看出 package 中如果有__main__.py 就会被执行。
+```C 
+    assert(!PyErr_Occurred());
+
+    if (config->run_command) {
+        *exitcode = pymain_run_command(config->run_command);
+    }
+    else if (config->run_module) {
+        *exitcode = pymain_run_module(config->run_module, 1);
+    }
+    else if (main_importer_path != NULL) {
+        *exitcode = pymain_run_module(L"__main__", 0);
+    }
+    else if (config->run_filename != NULL) {
+        *exitcode = pymain_run_file(config);
+    }
+    else {
+        *exitcode = pymain_run_stdin(config);
+    }
+
+```
+分支，由此进入具体的执行代码（根据不同运行方式。
+我们就只看最常见的file 执行方式吧
+```c
+static int
+pymain_run_file(const PyConfig *config)
+{
+    //  转 File Name 为Python 对象
+    PyObject *filename = PyUnicode_FromWideChar(config->run_filename, -1);
+    if (filename == NULL) {
+        PyErr_Print();
+        return -1;
+    }
+    // 转 Program Name 为Python 对象
+    PyObject *program_name = PyUnicode_FromWideChar(config->program_name, -1);
+    if (program_name == NULL) {
+        Py_DECREF(filename);
+        PyErr_Print();
+        return -1;
+    }
+
+    int res = pymain_run_file_obj(program_name, filename,
+                                  config->skip_source_first_line);
+    Py_DECREF(filename);
+    Py_DECREF(program_name);
+    return res;
+}
+
+
+```
+这是program name:
+ 0x555555c57fc0 L"/home/kokona/python_dev/cpython/cpython/python"
+
+  越过一些不重要的节点 之后到达运行：
+  ```C
+  int
+_PyRun_AnyFileObject(FILE *fp, PyObject *filename, int closeit,
+                     PyCompilerFlags *flags)
+{
+    int decref_filename = 0;
+    if (filename == NULL) {
+        filename = PyUnicode_FromString("???");
+        if (filename == NULL) {
+            PyErr_Print();
+            return -1;
+        }
+        decref_filename = 1;
+    }
+
+    int res;
+    if (_Py_FdIsInteractive(fp, filename)) {
+        res = _PyRun_InteractiveLoopObject(fp, filename, flags);
+        if (closeit) {
+            fclose(fp);
+        }
+    }
+    else {
+        res = _PyRun_SimpleFileObject(fp, filename, closeit, flags);
+    }
+
+    if (decref_filename) {
+        Py_DECREF(filename);
+    }
+    return res;
+}
+
+int
+PyRun_AnyFileExFlags(FILE *fp, const char *filename, int closeit,
+                     PyCompilerFlags *flags)
+{
+  ```
+  
+
+让我们看看 Simple_fileObject里有什么吧
+```C
+
+int
+_PyRun_SimpleFileObject(FILE *fp, PyObject *filename, int closeit,
+                        PyCompilerFlags *flags)
+{
+    int ret = -1;
+
+    PyObject *main_module = PyImport_AddModuleRef("__main__");
+    if (main_module == NULL)
+        return -1;
+    PyObject *dict = PyModule_GetDict(main_module);  // borrowed ref
+
+    int set_file_name = 0;
+    int has_file = PyDict_ContainsString(dict, "__file__");
+    if (has_file < 0) {
+        goto done;
+    }
+    if (!has_file) {
+        if (PyDict_SetItemString(dict, "__file__", filename) < 0) {
+            goto done;
+        }
+        if (PyDict_SetItemString(dict, "__cached__", Py_None) < 0) {
+            goto done;
+        }
+        set_file_name = 1;
+    }
+
+    int pyc = maybe_pyc_file(fp, filename, closeit);
+    if (pyc < 0) {
+        goto done;
+    }
+
+    PyObject *v;
+    if (pyc) {
+        FILE *pyc_fp;
+        /* Try to run a pyc file. First, re-open in binary */
+        if (closeit) {
+            fclose(fp);
+        }
+
+        pyc_fp = Py_fopen(filename, "rb");
+        if (pyc_fp == NULL) {
+            fprintf(stderr, "python: Can't reopen .pyc file\n");
+            goto done;
+        }
+
+        if (set_main_loader(dict, filename, "SourcelessFileLoader") < 0) {
+            fprintf(stderr, "python: failed to set __main__.__loader__\n");
+            ret = -1;
+            fclose(pyc_fp);
+            goto done;
+        }
+        v = run_pyc_file(pyc_fp, dict, dict, flags);
+    } else {
+        /* When running from stdin, leave __main__.__loader__ alone */
+        if ((!PyUnicode_Check(filename) || !PyUnicode_EqualToUTF8(filename, "<stdin>")) &&
+            set_main_loader(dict, filename, "SourceFileLoader") < 0) {
+            fprintf(stderr, "python: failed to set __main__.__loader__\n");
+            ret = -1;
+            goto done;
+        }
+        v = pyrun_file(fp, filename, Py_file_input, dict, dict,
+                       closeit, flags);
+    }
+    flush_io();
+    if (v == NULL) {
+        Py_CLEAR(main_module);
+        PyErr_Print();
+        goto done;
+    }
+    Py_DECREF(v);
+    ret = 0;
+
+  done:
+    if (set_file_name) {
+        if (PyDict_PopString(dict, "__file__", NULL) < 0) {
+            PyErr_Print();
+        }
+        if (PyDict_PopString(dict, "__cached__", NULL) < 0) {
+            PyErr_Print();
+        }
+    }
+    Py_XDECREF(main_module);
+    return ret;
+}
+
+```
+值得一提的是，Py开头的是对外开放的API 有文档可查 我们直接进入执行Pyrunfile函数
+```C
+static PyObject *
+pyrun_file(FILE *fp, PyObject *filename, int start, PyObject *globals,
+           PyObject *locals, int closeit, PyCompilerFlags *flags)
+{
+    // 内存分配涉及，我们暂时不看
+    PyArena *arena = _PyArena_New();
+    if (arena == NULL) {
+        return NULL;
+    }
+
+    // module AST 节点
+    mod_ty mod;
+    mod = _PyParser_ASTFromFile(fp, filename, NULL, start, NULL, NULL,
+                                flags, NULL, arena);
+
+    if (closeit) {
+        fclose(fp);
+    }
+
+    PyObject *ret;
+    // 运行module 了
+    if (mod != NULL) {
+        ret = run_mod(mod, filename, globals, locals, flags, arena, NULL, 0);
+    }
+    else {
+        ret = NULL;
+    }
+    _PyArena_Free(arena);
+
+    return ret;
+}
+
+
+```
+run_mod ：
+```c
+
+static PyObject *
+run_mod(mod_ty mod, PyObject *filename, PyObject *globals, PyObject *locals,
+            PyCompilerFlags *flags, PyArena *arena, PyObject* interactive_src,
+            int generate_new_source)
+{
+    PyThreadState *tstate = _PyThreadState_GET();
+    PyObject* interactive_filename = filename;
+    // 终端运行涉及
+    if (interactive_src) {
+        PyInterpreterState *interp = tstate->interp;
+        if (generate_new_source) {
+            interactive_filename = PyUnicode_FromFormat(
+                "%U-%d", filename, interp->_interactive_src_count++);
+        } else {
+            Py_INCREF(interactive_filename);
+        }
+        if (interactive_filename == NULL) {
+            return NULL;
+        }
+    }
+    // 编译一个 code object
+    PyCodeObject *co = _PyAST_Compile(mod, interactive_filename, flags, -1, arena);
+    if (co == NULL) {
+        if (interactive_src) {
+            Py_DECREF(interactive_filename);
+        }
+        return NULL;
+    }
+    // 不需要看，终端运行涉及
+    if (interactive_src) {
+        PyObject *print_tb_func = PyImport_ImportModuleAttrString(
+            "linecache",
+            "_register_code");
+        if (print_tb_func == NULL) {
+            Py_DECREF(co);
+            Py_DECREF(interactive_filename);
+            return NULL;
+        }
+
+        if (!PyCallable_Check(print_tb_func)) {
+            Py_DECREF(co);
+            Py_DECREF(interactive_filename);
+            Py_DECREF(print_tb_func);
+            PyErr_SetString(PyExc_ValueError, "linecache._register_code is not callable");
+            return NULL;
+        }
+
+        PyObject* result = PyObject_CallFunction(
+            print_tb_func, "OOO",
+            co,
+            interactive_src,
+            filename
+        );
+
+        Py_DECREF(interactive_filename);
+
+        Py_XDECREF(print_tb_func);
+        Py_XDECREF(result);
+        if (!result) {
+            Py_DECREF(co);
+            return NULL;
+        }
+    }
+
+    if (_PySys_Audit(tstate, "exec", "O", co) < 0) {
+        Py_DECREF(co);
+        return NULL;
+    }
+    // 运行 code obejct
+    PyObject *v = run_eval_code_obj(tstate, co, globals, locals);
+    Py_DECREF(co);
+    return v;
+}
+```
+下面进入codeobject云心g
+
+
+
+
+
+```C
+PyObject *
+PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
+{
+    PyThreadState *tstate = _PyThreadState_GET();
+    if (locals == NULL) {
+        locals = globals;
+    }
+    PyObject *builtins = _PyDict_LoadBuiltinsFromGlobals(globals);
+    if (builtins == NULL) {
+        return NULL;
+    }
+    PyFrameConstructor desc = {
+        .fc_globals = globals,
+        .fc_builtins = builtins,
+        .fc_name = ((PyCodeObject *)co)->co_name,
+        .fc_qualname = ((PyCodeObject *)co)->co_name,
+        .fc_code = co,
+        .fc_defaults = NULL,
+        .fc_kwdefaults = NULL,
+        .fc_closure = NULL
+    };
+    PyFunctionObject *func = _PyFunction_FromConstructor(&desc);
+    _Py_DECREF_BUILTINS(builtins);
+    if (func == NULL) {
+        return NULL;
+    }
+    EVAL_CALL_STAT_INC(EVAL_CALL_LEGACY);
+    PyObject *res = _PyEval_Vector(tstate, func, locals, NULL, 0, NULL);
+    Py_DECREF(func);
+    return res;
+}
+```
+Vector运行：
+```C
+PyObject *
+_PyEval_Vector(PyThreadState *tstate, PyFunctionObject *func,
+               PyObject *locals,
+               PyObject* const* args, size_t argcount,
+               PyObject *kwnames)
+{
+    size_t total_args = argcount;
+    if (kwnames) {
+        total_args += PyTuple_GET_SIZE(kwnames);
+    }
+    _PyStackRef stack_array[8];
+    _PyStackRef *arguments;
+    if (total_args <= 8) {
+        arguments = stack_array;
+    }
+    else {
+        arguments = PyMem_Malloc(sizeof(_PyStackRef) * total_args);
+        if (arguments == NULL) {
+            return PyErr_NoMemory();
+        }
+    }
+    /* _PyEvalFramePushAndInit consumes the references
+     * to func, locals and all its arguments */
+    Py_XINCREF(locals);
+    for (size_t i = 0; i < argcount; i++) {
+        arguments[i] = PyStackRef_FromPyObjectNew(args[i]);
+    }
+    if (kwnames) {
+        Py_ssize_t kwcount = PyTuple_GET_SIZE(kwnames);
+        for (Py_ssize_t i = 0; i < kwcount; i++) {
+            arguments[i+argcount] = PyStackRef_FromPyObjectNew(args[i+argcount]);
+        }
+    }
+    _PyInterpreterFrame *frame = _PyEvalFramePushAndInit(
+        tstate, PyStackRef_FromPyObjectNew(func), locals,
+        arguments, argcount, kwnames, NULL);
+    if (total_args > 8) {
+        PyMem_Free(arguments);
+    }
+    if (frame == NULL) {
+        return NULL;
+    }
+    EVAL_CALL_STAT_INC(EVAL_CALL_VECTOR);
+    return _PyEval_EvalFrame(tstate, frame, 0);
+}
+```
+一些优化部分我们跳过：
+```C
+
+static inline PyObject*
+_PyEval_EvalFrame(PyThreadState *tstate, _PyInterpreterFrame *frame, int throwflag)
+{
+    EVAL_CALL_STAT_INC(EVAL_CALL_TOTAL);
+    if (tstate->interp->eval_frame == NULL) {
+        return _PyEval_EvalFrameDefault(tstate, frame, throwflag);
+    }
+    return tstate->interp->eval_frame(tstate, frame, throwflag);
+}
+
+
+```
+这里eval->frame竟然可以手动调节，有关JIT。后续了解，
+## ceval.c 关键代码
+下面可以说是最关键的带啊吗
+```c
+
+PyObject* _Py_HOT_FUNCTION DONT_SLP_VECTORIZE
+_PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int throwflag)
+{
+    _Py_EnsureTstateNotNULL(tstate);
+    CALL_STAT_INC(pyeval_calls);
+
+
+```
+# switch main循环在这里进入
+```
+#endif
+#if Py_TAIL_CALL_INTERP
+#   if Py_STATS
+        return _TAIL_CALL_start_frame(frame, NULL, tstate, NULL, 0, lastopcode);
+#   else
+        return _TAIL_CALL_start_frame(frame, NULL, tstate, NULL, 0);
+#   endif
+#else
+    goto start_frame;
+#   include "generated_cases.c.h"
+#endif
+
+
+```
 
 
