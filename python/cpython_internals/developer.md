@@ -1075,3 +1075,211 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
 ```
 
 
+# OK 基本的执行流程我们已经走了以便，接下来，进行一次小实验：
+为我们的Cpython 添加箭头函数，这一次不使用Lambda,而是实现完整的字节码。
+
+## step1: 改变AST 
+```
+
+    git checkotu -b new branch
+```
+### 改变ASDL：
+```
+expr = BoolOp(boolop op, expr* values)
+         | NamedExpr(expr target, expr value)
+         | BinOp(expr left, operator op, expr right)
+         | UnaryOp(unaryop op, expr operand)
+         | Lambda(arguments args, expr body)
+
+         | ArrowLambda(arguments args,stmt* body)
+```
+make regen-ast结束之后，回到gram 文件。  
+在此之前，添加Token,否则两个运算符会被分开解析（lexer）。
+```
+COLONEQUAL              ':='
+EXCLAMATION             '!'
+RIGHTARROW              '=>'
+
+```
+params 可以使用前人经验：
+```
+function_def_raw[stmt_ty]:
+    | invalid_def_raw
+    | 'def' n=NAME t=[type_params] '(' params=[params] ')' a=['->' z=expression { z }] ':' tc=[func_type_comment] b=block {
+        _PyAST_FunctionDef(n->v.Name.id,
+                        (params) ? params : CHECK(arguments_ty, _PyPegen_empty_arguments(p)),
+                        b, NULL, a, NEW_TYPE_COMMENT(p, tc), t, EXTRA) }
+
+```
+
+
+
+
+
+OK，执行经典的make 语句之后得到报错：
+```
+Python/ast.c: In function ‘validate_expr’:
+Python/ast.c:259:5: warning: enumeration value ‘ArrowLambda_kind’ not handled in switch [-Wswitch]
+  259 |     switch (exp->kind) {
+      |     ^~~~~~
+Python/ast_opt.c: In function ‘astfold_expr’:
+Python/ast_opt.c:494:5: warning: enumeration value ‘ArrowLambda_kind’ not handled in switch [-Wswitch]
+  494 |     switch (node_->kind) {
+      |     ^~~~~~
+Python/ast_unparse.c: In function ‘append_ast_expr’:
+Python/ast_unparse.c:860:5: warning: enumeration value ‘ArrowLambda_kind’ not handled in switch [-Wswitch]
+  860 |     switch (e->kind) {
+      |     ^~~~~~
+Python/codegen.c: In function ‘codegen_visit_expr’:
+Python/codegen.c:5104:5: warning: enumeration value ‘ArrowLambda_kind’ not handled in switch [-Wswitch]
+ 5104 |     switch (e->kind) {
+      |     ^~~~~~
+Python/symtable.c: In function ‘symtable_visit_expr’:
+Python/symtable.c:2393:5: warning: enumeration value ‘ArrowLambda_kind’ not handled in switch [-Wswitch]
+ 2393 |     switch (e->kind) {
+      |     ^~~~~~
+Written build/lib.linux-x86_64-3.14/_sysconfigdata_d_linux_x86_64-linux-gnu.py
+```
+还需要在ast.c 中添加对 ArrowLambda_kind 的处理 验证.
+参考一下functiondef
+```C
+    switch (stmt->kind) {
+    case FunctionDef_kind:
+        ret = validate_body(stmt->v.FunctionDef.body, "FunctionDef") &&
+            validate_type_params(stmt->v.FunctionDef.type_params) &&
+            validate_arguments(stmt->v.FunctionDef.args) &&
+            validate_exprs(stmt->v.FunctionDef.decorator_list, Load, 0) &&
+            (!stmt->v.FunctionDef.returns ||
+             validate_expr(stmt->v.FunctionDef.returns, Load));
+        break;
+
+```
+简单：
+```C
+    case ArrowLambda_kind:
+        ret = validate_arguments(exp->v.ArrowLambda.args) &&
+            validate_stmts(exp->v.ArrowLambda.body);
+        break;
+
+```
+ok，让我们试试ast.py
+不行，报错。我猜测是因为还没处理机器码
+模仿这个函数来
+```C
+static int
+codegen_function(compiler *c, stmt_ty s, int is_async)
+{
+    arguments_ty args;
+    expr_ty returns;
+    identifier name;
+    asdl_expr_seq *decos;
+    asdl_type_param_seq *type_params;
+    Py_ssize_t funcflags;
+    int firstlineno;
+
+    // ...async 相关
+        assert(s->kind == FunctionDef_kind);
+
+        args = s->v.FunctionDef.args;
+        returns = s->v.FunctionDef.returns;
+        decos = s->v.FunctionDef.decorator_list;
+        name = s->v.FunctionDef.name;
+        type_params = s->v.FunctionDef.type_params;
+    }
+
+    // ... 装饰器相关
+    firstlineno = s->lineno;
+    if (asdl_seq_LEN(decos)) {
+        firstlineno = ((expr_ty)asdl_seq_GET(decos, 0))->lineno;
+    }
+
+    location loc = LOC(s);
+    //泛型函数相关
+    int is_generic = asdl_seq_LEN(type_params) > 0;
+
+    funcflags = codegen_default_arguments(c, loc, args);
+    RETURN_IF_ERROR(funcflags);
+
+    int num_typeparam_args = 0;
+
+    // if (is_generic) {
+    //     if (funcflags & MAKE_FUNCTION_DEFAULTS) {
+    //         num_typeparam_args += 1;
+    //     }
+    //     if (funcflags & MAKE_FUNCTION_KWDEFAULTS) {
+    //         num_typeparam_args += 1;
+    //     }
+    //     if (num_typeparam_args == 2) {
+    //         ADDOP_I(c, loc, SWAP, 2);
+    //     }
+    //     PyObject *type_params_name = PyUnicode_FromFormat("<generic parameters of %U>", name);
+    //     if (!type_params_name) {
+    //         return ERROR;
+    //     }
+    //     _PyCompile_CodeUnitMetadata umd = {
+    //         .u_argcount = num_typeparam_args,
+    //     };
+    //     int ret = codegen_enter_scope(c, type_params_name, COMPILE_SCOPE_ANNOTATIONS,
+    //                                   (void *)type_params, firstlineno, NULL, &umd);
+    //     Py_DECREF(type_params_name);
+    //     RETURN_IF_ERROR(ret);
+    //     RETURN_IF_ERROR_IN_SCOPE(c, codegen_type_params(c, type_params));
+    //     for (int i = 0; i < num_typeparam_args; i++) {
+    //         ADDOP_I_IN_SCOPE(c, loc, LOAD_FAST, i);
+    //     }
+    // }
+    //标注 没意思
+    int annotations_flag = codegen_function_annotations(c, loc, args, returns);
+    if (annotations_flag < 0) {
+        if (is_generic) {
+            _PyCompile_ExitScope(c);
+        }
+        return ERROR;
+    }
+    funcflags |= annotations_flag;
+    //  ok 我们就看这个函数
+    int ret = codegen_function_body(c, s, is_async, funcflags, firstlineno);
+    if (is_generic) {
+        RETURN_IF_ERROR_IN_SCOPE(c, ret);
+    }
+    else {
+        RETURN_IF_ERROR(ret);
+    }
+
+    if (is_generic) {
+        ADDOP_I_IN_SCOPE(c, loc, SWAP, 2);
+        ADDOP_I_IN_SCOPE(c, loc, CALL_INTRINSIC_2, INTRINSIC_SET_FUNCTION_TYPE_PARAMS);
+
+        PyCodeObject *co = _PyCompile_OptimizeAndAssemble(c, 0);
+        _PyCompile_ExitScope(c);
+        if (co == NULL) {
+            return ERROR;
+        }
+        int ret = codegen_make_closure(c, loc, co, 0);
+        Py_DECREF(co);
+        RETURN_IF_ERROR(ret);
+        if (num_typeparam_args > 0) {
+            ADDOP_I(c, loc, SWAP, num_typeparam_args + 1);
+            ADDOP_I(c, loc, CALL, num_typeparam_args - 1);
+        }
+        else {
+            ADDOP(c, loc, PUSH_NULL);
+            ADDOP_I(c, loc, CALL, 0);
+        }
+    }
+
+    RETURN_IF_ERROR(codegen_apply_decorators(c, decos));
+    return codegen_nameop(c, loc, name, Store);
+}
+```
+
+
+
+END...不知道为什么gram 总是不行 老师syntax Error...
+
+# GDB 调试Cpython:
+
+https://stackoverflow.com/questions/7412708/debugging-stepping-through-python-script-using-gdb
+I came up with a shorter version. Just add this one-liner in your python script to set a breakpoint import os, signal; os.kill(os.getpid(), signal.SIGTRAP)
+https://stackoverflow.com/questions/7412708/debugging-stepping-through-python-script-using-gdb
+

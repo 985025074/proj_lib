@@ -15,3 +15,7 @@ cipher = AES.new(key=key, mode=AES.MODE_CBC)
 ciphertext = cipher.iv + cipher.encrypt(pad(b"sleep", cipher.block_size))
 
 print(f"TASK: {ciphertext.hex()}")
+
+
+def SHABI()-> str : 
+    return "c7cc3e0fe41f7fd7b812f87653a8c3b25f9d1f54fe6dd40dd12cddd435c38692"
