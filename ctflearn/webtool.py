@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 编码url
 
 url_here = ""
@@ -21,3 +22,7 @@ for i in range(0,100):
             result += hope_letter
             break
         print(hope_letter)
+=======
+print(int.from_bytes(bytes.fromhex("65674d43"),"little").to_bytes(4).decode("ascii"))
+print(int(125).to_bytes(2,"little"))
+>>>>>>> 38578d7 (...sth save)

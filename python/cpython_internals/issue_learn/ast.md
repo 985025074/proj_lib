@@ -217,3 +217,8 @@ _PyErr_WarnExplicitObjectWithContext(PyObject *category, PyObject *message,
 ```
 
 setupcontext里 因为还在编译时期，所以运行正是NULL，自动搞了一个sys来。
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 38578d7 (...sth save)

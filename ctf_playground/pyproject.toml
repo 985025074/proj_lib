@@ -1,13 +1,10 @@
 [project]
-name = "playground"
+name = "ctf-playground"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-<<<<<<< HEAD
-=======
-    "numpy>=2.3.1",
->>>>>>> 38578d7 (...sth save)
-    "pycrypto>=2.6.1",
+    "pwntools>=4.14.1",
+    "rpyc>=6.0.2",
 ]

