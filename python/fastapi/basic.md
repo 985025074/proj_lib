@@ -8,6 +8,42 @@
 fastapi dev file  
 使用uv:  
 uv run  fastapi dev file
+# 分路线写法：
+```py
+from fastapi import APIRouter
+    
+router = APIRouter()
+
+@router.post("/login")
+def login(username: str, password: str):
+    # 假设这里是验证逻辑
+    if username == "admin" and password == "123456":
+        return {"message": "Login success!"}
+    return {"message": "Invalid credentials"}
+
+
+
+```
+```py
+from fastapi import FastAPI
+from routers import login, record
+
+app = FastAPI()
+
+# 注册不同模块的路由
+app.include_router(login.router)
+app.include_router(record.router)
+
+# 如果你想统一加前缀，例如 API 版本：
+# app.include_router(login.router, prefix="/api/v1")
+# app.include_router(record.router, prefix="/api/v1")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+```
 
 # 核心骨架：
 ```py
