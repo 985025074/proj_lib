@@ -219,3 +219,70 @@ DHCP是一个应用层协议，负责让设备能够自动获取IP地址（以
 据包是为了寻找正在监听的DHCP服务器。  
 
 **由客户 发送一个 包 来寻找 DHCP 服务器**
+此过程称之为 Discover,在wireshark 里也有对应的显示
+##### Offer 阶段
+
+DHCP 服务器 发送的
+
+ 重要字段：
+
+- your clinet IP Address 分配地址。
+- NextServer dhcp地址
+在下面的 options 中 还有lease time (expiration time ) 和 dns 服务器等诸多选项。
+
+
+##### 第三阶段：request
+
+值得注意的是。这个包仍然是一个广播（在IP 层） 并未完成确切设置。
+MAC 也是一样。
+
+##### 最终阶段 ACK
+
+服务器发出 此时 获得到了 ip
+
+##### 租约内的重新登陆
+
+request + 服务器 返回 ACK
+
+##### 思考：
+
+为什么要来一个request坏节呢？ offer完了 拿去用不就的了。
+
+答： 可能有多个dhcp 服务器 同时 可能在这个期间  有不行了
+
+另外 request 在续约中也是被用到的。
+
+
+还有一而写其他类型。拒绝 NAK 释放 等等。
+
+### DNS 协议 
+
+也是UDP 之上 
+
+#### DNS 类型
+
+1 A IPv4主机地址
+2 NS 权威域名服务器
+5 CNAME 规范别名
+15 MX 邮件交换
+16 TXT 文本字符串
+28 AAAA IPv6主机地址
+251 IXFR 增量区域传送
+dnsdns252 AXFR 完整区域传送
+
+#### 递归查询
+
+在DNS 查询中 有一个递归选项。当DNS 服务器不知道这个答案的时候 DNS 服务器会自己去查。
+
+Tranction ID
+
+####  区域 传送：
+
+dns 之间传递 信息 用的
+
+这里出现了一个 Tcp PDU reassemble in6 
+
+##### 这句话的意思
+这个包是大包的一部分，wireshark还不知道。等到了6才知道
+
+

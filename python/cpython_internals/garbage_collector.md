@@ -309,5 +309,108 @@ LOAD_SMALL_INT:小蒸熟吃
 
 两个重要文件 generated_cases.h 和 bytecode.c
 
+## internal_doc of garbage_collctor  
+
+the below function can be used to get the reference count of any object . always bigger than 1. 因为本身会带来一次引用
+
+```python
+    sys.getrefcount(object)
+
+```
+
+有一个例子：
+
+```python
+>>> container = []
+>>> container.append(container)
+>>> sys.getrefcount(container)
+3
+>>> del container
+
+```
+
+文档说这删不掉，那么我们看看del的代码吧。
+先来看看del对应字节码是什么
+
+```C
+>>> dis.dis(func)
+  1           RESUME                   0
+
+  2           LOAD_CONST               1 (1)
+              STORE_FAST               0 (a)
+
+  3           DELETE_FAST              0 (a)
+              RETURN_CONST             0 (None)
+>>> 
 
 
+```
+
+delete_Fast:
+
+```C
+        TARGET(DELETE_FAST) {
+            // #if Py_TAIL_CALL_INTERP
+            // int opcode = DELETE_FAST;
+            // (void)(opcode);
+            // #endif
+            frame->instr_ptr = next_instr;
+            next_instr += 1;
+            INSTRUCTION_STATS(DELETE_FAST);
+            _PyStackRef v = GETLOCAL(oparg);
+            if (PyStackRef_IsNull(v)) {
+                _PyFrame_SetStackPointer(frame, stack_pointer);
+                _PyEval_FormatExcCheckArg(tstate, PyExc_UnboundLocalError,
+                    UNBOUNDLOCAL_ERROR_MSG,
+                    PyTuple_GetItem(_PyFrame_GetCode(frame)->co_localsplusnames, oparg)
+                );
+                stack_pointer = _PyFrame_GetStackPointer(frame);
+                JUMP_TO_LABEL(error);
+            }
+            _PyStackRef tmp = GETLOCAL(oparg);
+            GETLOCAL(oparg) = PyStackRef_NULL;
+            _PyFrame_SetStackPointer(frame, stack_pointer);
+            PyStackRef_XCLOSE(tmp);
+            stack_pointer = _PyFrame_GetStackPointer(frame);
+            DISPATCH();
+        }
+```
+
+代码说明：
+
+经过一番探索 证明 在`PyStackRef_XCLOSE(tmp);`是仅仅进行当基数为0删除的。
+而上面`getlocal..` 则说明了 找不到变量 也就是NameError的来源：栈里的指针没了。
+
+```C
+static inline void Py_DECREF_MORTAL(PyObject *op)
+{
+    assert(!_Py_IsStaticImmortal(op));
+    _Py_DECREF_STAT_INC();
+    if (--op->ob_refcnt == 0) {
+        _Py_Dealloc(op);
+    }
+}
+
+```
+
+GC 头部：
+
+```raw
+                  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ \ |                    *_gc_next                  | | +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ | PyGC_Head
+                  |                    *_gc_prev                  | |
+    object -----> +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ /
+                  |                    ob_refcnt                  | \
+                  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ | PyObject_HEAD
+                  |                    *ob_type                   | |
+                  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+ /
+                  |                      ...                      |
+```
+
+这里的gcnext 和 prev 就是双指针节点的意思
+
+# 代码中造成cylic的情况有
+
+Exceptions contain traceback objects that contain a list of frames that contain the exception itself.
+Module-level functions reference the module's dict (which is needed to resolve globals), which in turn contains entries for the module-level functions.
+Instances have references to their class which itself references its module, and the module contains references to everything that is inside (and maybe other modules) and this can lead back to the original instance.
+When representing data structures like graphs, it is very typical for them to have internal links to themselves.
