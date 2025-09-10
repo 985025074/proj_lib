@@ -387,4 +387,271 @@ var sth A  就是一个nil interface
 
 ```
 
+### 类型推断
 
+从 interface 中拿出具体直
+
+```go
+
+package main
+
+import "fmt"
+
+func main() {
+	var i interface{} = "hello"
+
+	s := i.(string)
+	fmt.Println(s)
+
+	s, ok := i.(string)
+	fmt.Println(s, ok)
+
+	f, ok := i.(float64)
+	fmt.Println(f, ok)
+
+	f = i.(float64) // panic
+	fmt.Println(f)
+}
+如果没有有ok 那么当尝试取出不存在的志，就会出发panic
+```
+
+#### 类型断言族的switch 
+
+```go
+
+
+package main
+
+import "fmt"
+
+func do(i interface{}) {
+	switch v := i.(type) {
+	case int:
+		fmt.Printf("Twice %v is %v\n", v, v*2)
+	case string:
+		fmt.Printf("%q is %v bytes long\n", v, len(v))
+	default:
+		fmt.Printf("I don't know about type %T!\n", v)
+	}
+}
+
+func main() {
+	do(21)
+	do("hello")
+	do(true)
+}
+```
+
+### fmt.println的背后
+
+所有类型 寻找 Stinger 接口，也就是String()函数，返回string
+
+```go
+
+type stringer interface{
+    String() string
+}
+
+这是错误的处理方式 所有的错误类型需要实现 Error()接口
+i, err := strconv.Atoi("42")
+if err != nil {
+    fmt.Printf("couldn't convert number: %v\n", err)
+    return
+}
+fmt.Println("Converted integer:", i)
+```
+### type 不同于ts的仅仅只是一个类生命，他是一种全新类型，但是标注了底层类型。
+
+### Read方法 与 io 相关的都会提供
+
+```go
+
+func (T) Read (to_populate byte[]) (bytes_read int,is_error err)
+```
+
+## Image Interface 
+
+```go
+package image
+
+type Image interface {
+    ColorModel() color.Model
+    Bounds() Rectangle
+    At(x, y int) color.Color
+}
+
+```
+
+## Type Generics 类型
+
+```go
+package main
+
+import "fmt"
+
+// Index returns the index of x in s, or -1 if not found.
+func Index[T comparable](s []T, x T) int {
+	for i, v := range s {
+		// v and x are type T, which has the comparable
+		// constraint, so we can use == here.
+		if v == x {
+			return i
+		}
+	}
+	return -1
+}
+
+func main() {
+	// Index works on a slice of ints
+	si := []int{10, 20, 15, -10}
+	fmt.Println(Index(si, 15))
+
+	// Index also works on a slice of strings
+	ss := []string{"foo", "bar", "baz"}
+	fmt.Println(Index(ss, "hello"))
+}
+
+```
+
+## go coroutines:
+
+只需要
+```go
+
+go afunc()
+
+```
+
+就能出发
+
+### Channel 用于 go coroutines 的同步 类似管道
+
+```go
+package main
+
+import "fmt"
+
+func sum(s []int, c chan int) {
+	sum := 0
+	for _, v := range s {
+		sum += v
+	}
+	c <- sum // send sum to c
+}
+
+func main() {
+	s := []int{7, 2, 8, -9, 4, 0}
+
+	c := make(chan int)
+	go sum(s[:len(s)/2], c)
+	go sum(s[len(s)/2:], c)
+	x, y := <-c, <-c // receive from c
+
+	fmt.Println(x, y, x+y)
+}
+```
+
+chan must bed made before being used.
+
+#### channels 是 bufferd
+
+如果channel满了，就会堵塞在那里。
+
+#### 关闭channel 与检测是否关闭
+
+```go
+v, ok := <-ch
+The loop for i := range c receives values from the channel repeatedly until it is closed.
+close(ch)
+```
+
+channel的关闭始终由发送者进行，否则会造成panic。
+
+关闭不是必须的。只有像for loop 才需要。
+
+#### select 语句
+
+```go
+func fibonacci(c, quit chan int) {
+	x, y := 0, 1
+	for {
+		select {
+		case c <- x:
+			x, y = y, x+y
+		case <-quit:
+			fmt.Println("quit")
+			return
+		}
+	}
+}
+```
+哪个可以运行就哪个，如果好几个，那就随机一个。
+
+#### safe guard: mutex
+
+```go
+
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// SafeCounter is safe to use concurrently.
+type SafeCounter struct {
+	mu sync.Mutex
+	v  map[string]int
+}
+
+// Inc increments the counter for the given key.
+func (c *SafeCounter) Inc(key string) {
+	c.mu.Lock()
+	// Lock so only one goroutine at a time can access the map c.v.
+	c.v[key]++
+	c.mu.Unlock()
+}
+
+// Value returns the current value of the counter for the given key.
+func (c *SafeCounter) Value(key string) int {
+	c.mu.Lock()
+	// Lock so only one goroutine at a time can access the map c.v.
+    // 这个defer 很有C++ guard 的味道
+	defer c.mu.Unlock()
+	return c.v[key]
+}
+
+func main() {
+	c := SafeCounter{v: make(map[string]int)}
+	for i := 0; i < 1000; i++ {
+		go c.Inc("somekey")
+	}
+
+	time.Sleep(time.Second)
+	fmt.Println(c.Value("somekey"))
+}
+```
+
+## 包级别 只允许生命变量，而且不能后续进行赋值，除非初始化赋值。
+
+## 更多go 的学习资料
+
+[https://go.dev/tour/concurrency/11]
+You can get started by installing Go.
+
+Once you have Go installed, the Go Documentation is a great place to continue. It contains references, tutorials, videos, and more.
+
+To learn how to organize and work with Go code, read How to Write Go Code.
+
+If you need help with the standard library, see the package reference. For help with the language itself, you might be surprised to find the Language Spec is quite readable.
+
+To further explore Go's concurrency model, watch Go Concurrency Patterns (slides) and Advanced Go Concurrency Patterns (slides) and read the Share Memory by Communicating codewalk.
+
+To get started writing web applications, watch A simple programming environment (slides) and read the Writing Web Applications tutorial.
+
+The First Class Functions in Go codewalk gives an interesting perspective on Go's function types.
+
+The Go Blog has a large archive of informative Go articles.
+
+Visit the Go home page for more.
